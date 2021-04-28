@@ -3,7 +3,7 @@ resource "aws_s3_bucket" "b" {
   acl    = "private"
 
   tags = {
-    Name        = "raw-ambassy"
+    Name   = "raw-ambassy"
     Author = "cdemonchy"
   }
 }

@@ -1,0 +1,1 @@
+# serveless-embassy-locator

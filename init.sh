@@ -1,6 +1,14 @@
 #!/usr/bin/env sh
-aws s3api create-bucket \
- --no-object-lock-enabled-for-bucket \ # low update are expected of this project so better not had this
- --acl private \ # private for now
- --bucket raw-embassies \ # name of bucket
- --create-bucket-configuration '{"LocationConstraint": "eu-west-3"}' # we want this to be in Paris for the moment
+set -x
+set -e
+BUCKET_NAME=raw-embassies
+aws s3api head-bucket --bucket ${BUCKET_NAME}  2>&1
+if [ $? -ne 0 ]
+then
+    aws s3api create-bucket \
+        --no-object-lock-enabled-for-bucket \
+        --acl private \
+        --bucket $BUCKET_NAME \
+        --create-bucket-configuration '{"LocationConstraint": "eu-west-3"}'
+fi
+

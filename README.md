@@ -8,4 +8,11 @@ goal of this project is to have a simple use case for new aws features: [s3 Obje
 
 s3 Object feature is only available on console, cli and aws sdk.
 
-So we will use aws cli for setting thing up 
+So we will use aws cli for setting thing up
+
+```
+init.sh
+fetch.sh
+sync_to_s3.sh
+create_access_point.sh
+```

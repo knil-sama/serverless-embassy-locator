@@ -1,4 +1,4 @@
-# serveless-embassy-locator
+# serverless-embassy-locator
 
 goal of this project is to have a simple use case for new aws features: [s3 Object Lambda](https://aws.amazon.com/blogs/aws/introducing-amazon-s3-object-lambda-use-your-code-to-process-data-as-it-is-being-retrieved-from-s3/)
 

@@ -4,7 +4,7 @@ goal of this project is to have a simple use case for new aws features: [s3 Obje
 
 1. Fetch individual files for each countries locating their embassies
 2. Push file on s3 (private)
-3. Create s3 Object Lambda function to filter closest ambassy using nationality and coordinate
+3. Create s3 Object Lambda function to filter closest embassy using nationality and coordinate
 
 s3 Object feature is only available on console, cli and aws sdk.
 
@@ -16,3 +16,15 @@ fetch.sh
 sync_to_s3.sh
 create_access_point.sh
 ```
+
+Try using this extension for facilitate lambda and rust integration git@github.com:awslabs/aws-lambda-rust-runtime.git
+
+clean_embassy: lambda in Rust that will be trigger by a new file pushed on s3 then clean the csv and push to another s3 folder in parquet
+
+cargo lambda deploy \
+  --iam-role arn:aws:iam::XXXXXXXXXXXXX:role/your_lambda_execution_role
+
+  cargo lambda invoke --remote \
+  --data-ascii '{"command": "hi"}' \
+  --output-format json \
+  my-first-lambda-function

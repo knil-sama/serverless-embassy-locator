@@ -17,7 +17,7 @@ sync_to_s3.sh
 create_access_point.sh
 ```
 
-Try using this extension for facilitate lambda and rust integration git@github.com:awslabs/aws-lambda-rust-runtime.git
+Try using this extension for facilitate lambda and rust integration https://github.com/awslabs/aws-lambda-rust-runtime
 
 clean_embassy: lambda in Rust that will be trigger by a new file pushed on s3 then clean the csv and push to another s3 folder in parquet
 
@@ -28,3 +28,5 @@ cargo lambda deploy \
   --data-ascii '{"command": "hi"}' \
   --output-format json \
   my-first-lambda-function
+
+  sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies

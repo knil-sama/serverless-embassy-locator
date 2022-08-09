@@ -3,8 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 Description: S3 bucket to EventBridge to Lambda
 
 Parameters:
-
-SourceBucket:
+  SourceBucket:
     Type: String
 
 Resources:
@@ -37,7 +36,7 @@ Resources:
       Timeout: 30
       Policies:
         - S3ReadPolicy:
-            BucketName: !Sub "${SourceBucket}"
+            BucketName: !Ref SourceBucket
       Events:
         Trigger:
           Type: EventBridgeRule
@@ -50,7 +49,7 @@ Resources:
               detail:
                 bucket:
                   name:
-                    - !Sub "${SourceBucket}"
+                    - !Ref SourceBucket
     Environment:
       Variables:
         RUST_BACKTRACE: 1
@@ -58,7 +57,7 @@ Resources:
 
 Outputs:
   SourceBucketName:
-    Value: !Sub "${SourceBucket}"
+    Value: !Ref SourceBucket
     Description: S3 Bucket for object storage
   FunctionArn:
     Value: !Ref MyFunction

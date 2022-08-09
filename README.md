@@ -30,3 +30,9 @@ cargo lambda deploy \
   my-first-lambda-function
 
   sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies
+
+
+Great work already done here to agregate and clean embassies
+https://github.com/database-of-embassies/database-of-embassies
+
+aws-sso-util console launch --account-id 650593633156 --role-name AdministratorAccess

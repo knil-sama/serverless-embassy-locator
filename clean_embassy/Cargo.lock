@@ -534,6 +534,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-s3",
  "aws_lambda_events",
+ "bytes",
  "csv",
  "lambda_runtime",
  "parquet",

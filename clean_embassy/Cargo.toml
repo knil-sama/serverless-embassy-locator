@@ -17,14 +17,24 @@ edition = "2021"
 [dependencies]
 aws_lambda_events = { version = "0.6.3", default-features = false, features = ["s3"] }
 csv = "1.1.6"
-serde = { version = "1.0.142", features = ["derive"] }
+serde = { version = "1.0.142"}
 lambda_runtime = "0.6.0"
 parquet = "19.0.0"
-tokio = { version = "1", features = ["macros"] }
 tracing = { version = "0.1", features = ["log"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 aws-config = "0.46.0"
 aws-sdk-s3 = "0.16.0"
 serde_json = "1.0.83"
 bytes = "1.2.1"
-
+log = "0.4.17"
+chrono = "0.4.21"
+slog = "2.7.0"
+slog-async = "2.7.0"
+slog-json = "2.6.1"
+serde_arrow = "0.5.0"
+tokio = "1.20.1"
+arrow2_convert = "0.2.0"
+arrow2_convert_derive = "0.2.0"
+# must match arrow2_convert
+arrow2 = { version = "0.12", features = ["io_parquet", "io_parquet_compression"] }
+dyn-clone = "1.0.9"

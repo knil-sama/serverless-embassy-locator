@@ -29,10 +29,16 @@ cargo lambda deploy \
   --output-format json \
   my-first-lambda-function
 
-  sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies
+  sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-eu-west-3-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies --region eu-west-3
 
 
 Great work already done here to agregate and clean embassies
 https://github.com/database-of-embassies/database-of-embassies
 
 aws-sso-util console launch --account-id 650593633156 --role-name AdministratorAccess
+
+aws s3 cp ./data/embassie.csv s3://raw-embassies/embassie.csv
+
+use arrow https://docs.rs/arrow/0.13.0/arrow/csv/reader/index.html ? how to handle except in row ?
+
+go back to initial plan and write struct as parquet ?

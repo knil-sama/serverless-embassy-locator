@@ -29,7 +29,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./clean_embassy/target/lambda/clean_ambassy/bootstrap
-      Architectures: ["arm64"]
+      Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
       Handler: bootstrap
       Runtime: provided.al2
       MemorySize: 512
@@ -50,10 +50,10 @@ Resources:
                 bucket:
                   name:
                     - !Ref SourceBucket
-    Environment:
-      Variables:
-        RUST_BACKTRACE: 1
-        RUST_LOG: info
+      Environment:
+        Variables:
+          RUST_BACKTRACE: 1
+          RUST_LOG: info
 
 Outputs:
   SourceBucketName:

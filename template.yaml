@@ -5,10 +5,11 @@ Description: S3 bucket to EventBridge to Lambda
 Parameters:
   SourceBucket:
     Type: String
-
+  DestinationBucket:
+    Type: String
 Resources:
   # Enforce HTTPS only access to S3 bucket #
-  BucketForImagePolicy:
+  BucketSourceForImagePolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
       Bucket: !Sub "${SourceBucket}"
@@ -20,6 +21,22 @@ Resources:
           Resource:
           - !Sub "arn:aws:s3:::${SourceBucket}/*"
           - !Sub "arn:aws:s3:::${SourceBucket}"
+          Condition:
+            Bool:
+              aws:SecureTransport: false
+
+  BucketDestinationForImagePolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Sub "${DestinationBucket}"
+      PolicyDocument:
+        Statement:
+        - Action: s3:*
+          Effect: Deny
+          Principal: "*"
+          Resource:
+          - !Sub "arn:aws:s3:::${DestinationBucket}/*"
+          - !Sub "arn:aws:s3:::${DestinationBucket}"
           Condition:
             Bool:
               aws:SecureTransport: false
@@ -37,6 +54,8 @@ Resources:
       Policies:
         - S3ReadPolicy:
             BucketName: !Ref SourceBucket
+        - S3WritePolicy:
+            BucketName: !Ref DestinationBucket
       Events:
         Trigger:
           Type: EventBridgeRule
@@ -52,13 +71,16 @@ Resources:
                     - !Ref SourceBucket
       Environment:
         Variables:
-          RUST_BACKTRACE: 1
+          RUST_BACKTRACE: full
           RUST_LOG: info
 
 Outputs:
   SourceBucketName:
     Value: !Ref SourceBucket
-    Description: S3 Bucket for object storage
+    Description: S3 Bucket source for object storage
+  DestinationBucketName:
+    Value: !Ref DestinationBucket
+    Description: S3 Bucket destination for object storage
   FunctionArn:
     Value: !Ref MyFunction
     Description: MyFunction ARN

@@ -16,14 +16,11 @@ use std::io::{Cursor};
 use std::iter::Iterator;
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::types::AggregatedBytes;
-use arrow2::array::*;
 use arrow2::io::parquet::write::*;
 use arrow2::chunk::Chunk;
-use arrow2_convert::ArrowField;
-use arrow2_convert::serialize::TryIntoArrow;
-use std::sync::Arc;
-
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize, ArrowField)]
+use arrow2::datatypes::{Field, Schema};
+use arrow2::{array::{Utf8Array, Array, Float32Array}};
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Embassy {
     operator: String,
@@ -167,6 +164,45 @@ fn read_csv(data: AggregatedBytes) -> (Vec<Embassy>, Vec<csv::Error>) {
     let errors: Vec<csv::Error> = errors.into_iter().map(Result::unwrap_err).collect();
     (valid_rows, errors)
 }
+
+fn generate_arrow(valid_rows: Vec<Embassy>) -> (Schema, Chunk<Box<dyn Array>>) {
+    let operators: Vec<Option<&str>> = valid_rows.iter().map(|embassie| Some(embassie.operator.as_str())).collect::<Vec<_>>();
+    let operator_array = Utf8Array::<i32>::from(operators);
+    let field_operator = Field::new("operator", operator_array.data_type().clone(), false);
+    
+    let countries: Vec<Option<&str>> = valid_rows.iter().map(|embassie| Some(embassie.country.as_str())).collect::<Vec<_>>();
+    let country_array = Utf8Array::<i32>::from(countries);    
+    let field_country = Field::new("country", country_array.data_type().clone(), false);
+
+    let addresses: Vec<Option<&str>> = valid_rows.iter().map(|embassie| Some(embassie.address.as_str())).collect::<Vec<_>>();
+    let address_array = Utf8Array::<i32>::from(addresses);    
+    let field_address = Field::new("address",address_array.data_type().clone(), false);
+
+    let websites: Vec<Option<&str>> = valid_rows.iter().map(|embassie| Some(embassie.website.as_str())).collect::<Vec<_>>();
+    let website_array = Utf8Array::<i32>::from(websites);    
+    let field_website = Field::new("website",website_array.data_type().clone(), false);
+
+    let phones: Vec<Option<&str>> = valid_rows.iter().map(|embassie| Some(embassie.phone.as_str())).collect::<Vec<_>>();
+    let phone_array = Utf8Array::<i32>::from(phones);    
+    let field_phone = Field::new("phone",phone_array.data_type().clone(), false);
+
+    let emails: Vec<Option<&str>> = valid_rows.iter().map(|embassie| Some(embassie.email.as_str())).collect::<Vec<_>>();
+    let email_array = Utf8Array::<i32>::from(emails);    
+    let field_email = Field::new("email",email_array.data_type().clone(), false);
+
+    let latitudes: Vec<Option<f32>> = valid_rows.iter().map(|embassie| Some(embassie.latitude)).collect::<Vec<_>>();
+    let latitude_array = Float32Array::from(latitudes);    
+    let field_latitude = Field::new("latitude",latitude_array.data_type().clone(), false);
+
+    let longitudes: Vec<Option<f32>> = valid_rows.iter().map(|embassie| Some(embassie.longitude)).collect::<Vec<_>>();
+    let longitude_array = Float32Array::from(longitudes);    
+    let field_longitude = Field::new("longitude",longitude_array.data_type().clone(), false);
+    
+    let schema = Schema::from(vec![field_operator, field_country, field_address, field_website, field_phone, field_email, field_latitude, field_longitude]);
+    let chunk = Chunk::new(vec![operator_array.boxed(), country_array.boxed(), address_array.boxed(), website_array.boxed(), phone_array.boxed(), email_array.boxed(), latitude_array.boxed(), longitude_array.boxed()]);
+    (schema, chunk) 
+}
+
 /// This is the main body for the function.
 /// Write your code inside it.
 /// There are some code example in the following URLs:
@@ -196,6 +232,8 @@ async fn function_handler(event: LambdaEvent<EventBridgeEvent>) -> Result<Value,
     .await?;
     let data = resp.body.collect().await?;
 
+    // replace with arrow read ? https://github.com/jorgecarleitao/arrow2/blob/v0.13.1/examples/csv_read.rs
+    // seem less felxible to handle error and specify schema
     let (valid_rows, errors)= read_csv(data);
 
     let number_of_valid_records = valid_rows.len().to_string();
@@ -206,34 +244,18 @@ async fn function_handler(event: LambdaEvent<EventBridgeEvent>) -> Result<Value,
     // currently "msg": "number of errors :1257",
     info!(log,"first error :{first_error}");
     info!(log,"Done parsing csv");
-    // TODO use key for naming instead ? and remove file extensions
-    let output_filename = "embassie.parquet";
-    //https://github.com/apache/arrow-rs/issues/1927
-    // convert vec of record to arrow
-    let arrow_array_a: Box<dyn Array> = valid_rows.try_into_arrow().unwrap();
-    // can't clone dyn Array so we have to duplicate stuff here, probably wrong but will work
-    let arrow_array_b: Box<dyn Array> = valid_rows.try_into_arrow().unwrap();
-
-    // need StructArray to get fields
-    let data_type = arrow_array_a.data_type().to_owned();
-    // thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/main.rs:219:50
-    // ignore this shit
-    //let validity = Some(arrow_array_a.validity().unwrap_or(None).to_owned());
-    let arrays = vec![Arc::from(arrow_array_a)];
-    // From fields we got schema
-    let struct_array: StructArray = StructArray::from_data(data_type, arrays, None);
-    let chunk =Chunk::new(vec![arrow_array_b]);
+ 
+    let (schema, chunk) = generate_arrow(valid_rows);
     let options = WriteOptions {
         write_statistics: true,
         compression: CompressionOptions::Snappy,
         version: Version::V1,
     };
-    let schema = arrow2::datatypes::Schema::from(struct_array.fields().to_vec());
     let row_groups = RowGroupIterator::try_new(
         vec![Ok(chunk)].into_iter(),
         &schema,
         options,
-        vec![vec![Encoding::Plain], vec![Encoding::Plain]],
+        vec![vec![Encoding::Plain]; schema.fields.len()],
     )?;
 
     // anything implementing `std::io::Write` works
@@ -248,6 +270,8 @@ async fn function_handler(event: LambdaEvent<EventBridgeEvent>) -> Result<Value,
     let _ = writer.end(None)?;
 
     let body = ByteStream::from(writer.into_inner());
+    // TODO use key for naming instead ? and remove file extensions
+    let output_filename = "embassies.parquet";
     let _resp = s3_client
     .put_object()
     .bucket("clean-embassies")

@@ -29,8 +29,7 @@ cargo lambda deploy \
   --output-format json \
   my-first-lambda-function
 
-  sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-eu-west-3-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies --region eu-west-3
-
+  sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-eu-west-3-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies DestinationBucket=clean-embassies --region eu-west-3
 
 Great work already done here to agregate and clean embassies
 https://github.com/database-of-embassies/database-of-embassies

@@ -31,10 +31,5 @@ chrono = "0.4.21"
 slog = "2.7.0"
 slog-async = "2.7.0"
 slog-json = "2.6.1"
-serde_arrow = "0.5.0"
 tokio = "1.20.1"
-arrow2_convert = "0.2.0"
-arrow2_convert_derive = "0.2.0"
-# must match arrow2_convert
-arrow2 = { version = "0.12", features = ["io_parquet", "io_parquet_compression"] }
-dyn-clone = "1.0.9"
+arrow2 = { version = "0.13.1", features = ["io_parquet", "io_parquet_compression"] }

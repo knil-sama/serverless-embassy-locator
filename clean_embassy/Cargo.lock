@@ -617,7 +617,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "clean_ambassy"
+name = "clean_embassy"
 version = "0.1.0"
 dependencies = [
  "arrow2",

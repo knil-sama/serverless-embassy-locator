@@ -7,6 +7,10 @@ Parameters:
     Type: String
   DestinationBucket:
     Type: String
+  AppName:
+    Description: Name of Application
+    Type: String
+    Default: apigw-http-api-lambda
 Resources:
   # Enforce HTTPS only access to S3 bucket #
   BucketSourceForImagePolicy:
@@ -42,10 +46,10 @@ Resources:
               aws:SecureTransport: false
 
   ## Lambda function
-  MyFunction:
+  CleanFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./clean_embassy/target/lambda/clean_ambassy/bootstrap
+      CodeUri: ./clean_embassy/target/lambda/clean_embassy/bootstrap
       Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
       Handler: bootstrap
       Runtime: provided.al2
@@ -74,6 +78,52 @@ Resources:
           RUST_BACKTRACE: full
           RUST_LOG: info
 
+##########################################################################
+#  API Gateway HTTP API                                                  #
+##########################################################################
+  HttpApi:
+    Type: 'AWS::ApiGatewayV2::Api'
+    Properties:
+      Name: !Ref AppName
+      Description: An Amazon API Gateway HTTP API and an AWS Lambda function.
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - HEAD
+          - OPTIONS
+          - POST
+      Target: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FilterFunction}/invocations
+##########################################################################
+#   Lambda Function                                                      #
+##########################################################################
+  FilterFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      CodeUri: ./filter_embassy/target/lambda/filter_embassy/bootstrap
+      Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
+      # Function permissions grant an AWS service or another account permission to use a function
+      Handler: bootstrap
+      Runtime: provided.al2
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref DestinationBucket
+      Environment:
+        Variables:
+          RUST_BACKTRACE: full
+          RUST_LOG: info
+  FunctionResourcePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      FunctionName: !Ref FilterFunction
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*'
+
 Outputs:
   SourceBucketName:
     Value: !Ref SourceBucket
@@ -82,6 +132,8 @@ Outputs:
     Value: !Ref DestinationBucket
     Description: S3 Bucket destination for object storage
   FunctionArn:
-    Value: !Ref MyFunction
-    Description: MyFunction ARN
-
+    Value: !Ref CleanFunction
+    Description: CleanFunction ARN
+  HttpApiEndpoint:
+    Description: The default endpoint for the HTTP API.
+    Value: !GetAtt HttpApi.ApiEndpoint

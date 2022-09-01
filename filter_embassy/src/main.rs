@@ -2,20 +2,20 @@
 extern crate slog;
 extern crate slog_json;
 extern crate slog_async;
+extern crate fstrings;
 
+use fstrings::format_f;
+use fstrings::format_args_f;
 use slog::Drain;
-use std::io::{Cursor};
 use std::iter::Iterator;
-use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::types::AggregatedBytes;
 use parquet::file::reader::{FileReader, SerializedFileReader};
-use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
+use lambda_http::{run, service_fn, Body, Error, Request, Response};
 
 /// This is the main body for the function.
 /// Write your code inside it.
 /// There are some code example in the following URLs:
 /// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples
-async fn function_handler(event: Request) -> Result<Response<Body>, Error> {
+async fn function_handler(_event: Request) -> Result<Response<Body>, Error> {
     // Extract some useful information from the request
     // SETTING LOGGER
     let drain = slog_json::Json::new(std::io::stdout())
@@ -39,14 +39,15 @@ async fn function_handler(event: Request) -> Result<Response<Body>, Error> {
     .send()
     .await?;
     let data = resp.body.collect().await?;
-    let buf = Cursor::new(data.into_bytes());
-    let reader = SerializedFileReader::new(buf).unwrap();
+    let reader = SerializedFileReader::new(data.into_bytes()).unwrap();
 
-    let parquet_metadata = reader.metadata();
+    let _parquet_metadata = reader.metadata();
     let mut body_str = "".to_string();
     // & is key
-    for row in reader.get_row_iter() {
-        body_str.push_str("{row}");
+    for row in reader.get_row_iter(None).unwrap() {
+        for (idx, (name, field)) in row.get_column_iter().enumerate() {
+            body_str.push_str(&format_f!("column index: {idx}, column name: {name}, column value: {field}"));
+        }
     }
     // Return something that implements IntoResponse.
     // It will be serialized to the right response event automatically by the runtime

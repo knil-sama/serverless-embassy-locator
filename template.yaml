@@ -28,7 +28,6 @@ Resources:
           Condition:
             Bool:
               aws:SecureTransport: false
-
   BucketDestinationForImagePolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -44,7 +43,6 @@ Resources:
           Condition:
             Bool:
               aws:SecureTransport: false
-
   ## Lambda function
   CleanFunction:
     Type: AWS::Serverless::Function
@@ -73,6 +71,9 @@ Resources:
                 bucket:
                   name:
                     - !Ref SourceBucket
+      Tags:
+        project: "serverless-embassy-locator"
+        application: "backend"
       Environment:
         Variables:
           RUST_BACKTRACE: full
@@ -96,6 +97,9 @@ Resources:
           - OPTIONS
           - POST
       Target: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FilterFunction}/invocations
+      Tags:
+        project: "serverless-embassy-locator"
+        application: "frontend"
 ##########################################################################
 #   Lambda Function                                                      #
 ##########################################################################
@@ -116,6 +120,9 @@ Resources:
         Variables:
           RUST_BACKTRACE: full
           RUST_LOG: info
+      Tags:
+        project: "serverless-embassy-locator"
+        application: "backend"
   FunctionResourcePermission:
     Type: 'AWS::Lambda::Permission'
     Properties:

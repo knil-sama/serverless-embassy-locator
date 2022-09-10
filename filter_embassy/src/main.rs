@@ -13,7 +13,8 @@ use lambda_http::{run, service_fn, Body, Error, Request, Response};
 /// There are some code example in the following URLs:
 /// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples
 async fn function_handler(_event: Request) -> Result<Response<Body>, Error> {
-    // Extract some useful information from the request
+    // can't use http localization from http api
+    // https://stackoverflow.com/questions/64318725/geolocation-service-with-aws-api-gateway-and-lambda
     // SETTING LOGGER
     let drain = slog_json::Json::new(std::io::stdout())
         .set_pretty(true)
@@ -26,10 +27,6 @@ async fn function_handler(_event: Request) -> Result<Response<Body>, Error> {
     // S3 CLIENT
     let config = aws_config::load_from_env().await;
     let s3_client = aws_sdk_s3::Client::new(&config);
-    // Extract some useful information from the request
-    info!(log,"received event");
-    let event_str = format!("{_event:?}");
-    info!(log,"{event_str}");
     // DOWNLOAD PARQUET
     let resp = s3_client
     .get_object()
@@ -39,8 +36,7 @@ async fn function_handler(_event: Request) -> Result<Response<Body>, Error> {
     .await?;
     let data = resp.body.collect().await?;
     let columns_to_keep = vec!("operator", "country", "website","phone","email");
-    // CREATE SCHEMA PROJECTION
-    //let parquet_projection = ;
+
     let reader = SerializedFileReader::new(data.into_bytes()).unwrap();
     let mut body_str = "<input type=\"text\" id=\"nationality\" onkeyup=\"filterByNationality()\" placeholder=\"Search your embassy by nationality\">".to_string();
     // & is key

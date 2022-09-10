@@ -3,7 +3,6 @@ extern crate slog;
 extern crate slog_json;
 extern crate slog_async;
 extern crate fstrings;
-use parquet::schema::types::Type;
 use slog::Drain;
 use std::iter::Iterator;
 use parquet::file::reader::{FileReader, SerializedFileReader};
@@ -39,64 +38,49 @@ async fn function_handler(_event: Request) -> Result<Response<Body>, Error> {
     .send()
     .await?;
     let data = resp.body.collect().await?;
-
+    let columns_to_keep = vec!("operator", "country", "website","phone","email");
     // CREATE SCHEMA PROJECTION
     //let parquet_projection = ;
     let reader = SerializedFileReader::new(data.into_bytes()).unwrap();
-
-    let schema: &parquet::schema::types::Type = reader.metadata().file_metadata().schema();
-    let requested_fields = vec!("operator", "country", "website", "phone", "email");
-    let mut selected_fields = schema.get_fields().to_vec();
-    if requested_fields.len()>0{
-	    selected_fields.retain(|f|  
-		  requested_fields.contains(&f.name()));
-    }			
-    let schema_projection = Type::group_type_builder("schema")
-    .with_fields(&mut selected_fields)
-    .build()
-    .unwrap();
     let mut body_str = "<input type=\"text\" id=\"nationality\" onkeyup=\"filterByNationality()\" placeholder=\"Search your embassy by nationality\">".to_string();
     // & is key
     body_str.push_str("<table id=\"embassies\">");
     //thread 'main' panicked at 'called `Result::unwrap()` on an `Err` value: General("Root schema does not contain projection")', src/main.rs:62:75 
-    for (row_number, row) in reader.get_row_iter(Some(schema_projection)).unwrap().enumerate() {
+    for (row_number, row) in reader.get_row_iter(None).unwrap().enumerate() {
         // Set header
         if row_number == 0 {
-            body_str.push_str("<tr>");  
+            body_str.push_str("<tr class=\"header\">");  
             for (name, _) in row.get_column_iter() {
+              if columns_to_keep.contains(&name.as_str()){
                 body_str.push_str(&format!("<th>{}</th>", name));
+              }
             }
             body_str.push_str("<tr>");  
         }
         body_str.push_str("<tr>");  
-        for (_, value) in row.get_column_iter() {
-            body_str.push_str(&format!("<td>{}</td>", value.to_string().replace("\"", "")));
+        for (name, value) in row.get_column_iter() {
+          if columns_to_keep.contains(&name.as_str()){
+            body_str.push_str(&format!("<td>{}</td>", value.to_string().replace('"',"")));
+          }
         }
         body_str.push_str("<tr>"); 
     }
     body_str.push_str("</table>");
     body_str.push_str("<script>
-function filterByNationality() {
-  // Declare variables
-  var input, filter, table, tr, td, i, txtValue;
-  var operatorColumnId = 0;
-  input = document.getElementById(\"nationality\");
-  filter = input.value.toUpperCase();
-  table = document.getElementById(\"embassies\");
-  tr = table.getElementsByTagName(\"tr\");
-  // Loop through all table rows, and hide those who don't match the search query
-  for (i = 0; i < tr.length; i++) {
-    td = tr[i].getElementsByTagName(\"td\")[operatorColumnId];
-    if (td) {
-      txtValue = td.textContent || td.innerText;
-      if (txtValue.toUpperCase().indexOf(filter) > -1) {
-        tr[i].style.display = \"\";
-      } else {
-        tr[i].style.display = \"none\";
+    const filterByNationality = () => {
+      const trs = document.querySelectorAll('#embassies tr:not(.header)')
+      const filter = document.querySelector('#nationality').value
+      const regex = new RegExp(filter, 'i')
+      const isFoundInTds = td => regex.test(td.innerHTML)
+      const isFound = childrenArr => childrenArr.some(isFoundInTds)
+      const setTrStyleDisplay = ({ style, children }) => {
+        style.display = isFound([
+          ...children // <-- All columns
+        ]) ? '' : 'none' 
       }
+      
+      trs.forEach(setTrStyleDisplay)
     }
-  }
-}
 </script>");
     // Return something that implements IntoResponse.
     // It will be serialized to the right response event automatically by the runtime

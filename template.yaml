@@ -12,6 +12,19 @@ Parameters:
     Type: String
     Default: apigw-http-api-lambda
 Resources:
+  CrawlerLatestExecution:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: crawler-latest-execution
+      Description: SSM Parameter value to store latest execution for the crawler lambda function
+      Type: String
+      Tier: Standard
+      Value: "2022-01-01T20:23:23+00:00"
+      AllowedPattern: "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\+|-)\\d{2}:\\d{2}$"
+      Tags:
+        project: "serverless-embassy-locator"
+        application: "crawler"
+
   # Enforce HTTPS only access to S3 bucket #
   BucketSourceForImagePolicy:
     Type: AWS::S3::BucketPolicy

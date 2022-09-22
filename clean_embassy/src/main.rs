@@ -20,6 +20,7 @@ use arrow2::io::parquet::write::*;
 use arrow2::chunk::Chunk;
 use arrow2::datatypes::{Field, Schema};
 use arrow2::{array::{Utf8Array, Array, Float32Array}};
+
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Embassy {

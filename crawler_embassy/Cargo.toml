@@ -1,0 +1,43 @@
+[package]
+name = "crawler_embassy"
+version = "0.1.0"
+edition = "2021"
+
+# Starting in Rust 1.62 you can use `cargo add` to add dependencies 
+# to your project.
+#
+# If you're using an older Rust version,
+# download cargo-edit(https://github.com/killercup/cargo-edit#installation) 
+# to install the `add` subcommand.
+#
+# Running `cargo add DEPENDENCY_NAME` will
+# add the latest version of a dependency to the list,
+# and it will keep the alphabetic ordering for you.
+
+[dependencies]
+aws_lambda_events = { version = "0.6.3", default-features = false }
+
+lambda_runtime = "0.6.1"
+tokio = { version = "1", features = ["macros"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+serde = { version = "1.0.142"}
+chrono = "0.4.21"
+slog = "2.7.0"
+slog-async = "2.7.0"
+slog-json = "2.6.1"
+log = "0.4.17"
+serde_json = "1.0.83"
+aws-config = "0.47.0"
+aws-sdk-s3 = "0.17.0"
+reqwest = "0.11.12"
+
+# https://github.com/sfackler/rust-openssl/issues/980
+# Add openssl-sys as a direct dependency so it can be cross compiled to
+# x86_64-unknown-linux-gnu using the "vendored" feature below
+openssl-sys = "*"
+
+[features]
+# Force openssl-sys to staticly link in the openssl library. Necessary when
+# cross compiling to x86_64-unknown-linux-gnu.
+vendored = ["openssl-sys/vendored"]

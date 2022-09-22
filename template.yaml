@@ -41,6 +41,7 @@ Resources:
           Condition:
             Bool:
               aws:SecureTransport: false
+
   BucketDestinationForImagePolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -56,6 +57,35 @@ Resources:
           Condition:
             Bool:
               aws:SecureTransport: false
+
+  CrawlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./crawler_embassy/target/lambda/crawler_embassy/bootstrap
+      Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
+      Handler: bootstrap
+      Runtime: provided.al2
+      MemorySize: 512
+      Timeout: 30
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref SourceBucket
+      Events:
+        Trigger:
+          Type: Schedule
+          Properties:
+            Schedule: 'cron(0 0 1 * ? *)'
+            Name: ServerlessEmbassyScheduleCrawler
+            Description: schedule for crawler first day of month
+            Enabled: true
+      Tags:
+        project: "serverless-embassy-locator"
+        application: "crawler"
+      Environment:
+        Variables:
+          RUST_BACKTRACE: full
+          RUST_LOG: info
+
   ## Lambda function
   CleanFunction:
     Type: AWS::Serverless::Function

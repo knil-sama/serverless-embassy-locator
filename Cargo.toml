@@ -1,0 +1,17 @@
+[workspace]
+
+members = [
+    "crawler_embassy", "clean_embassy","filter_embassy"
+]
+
+[workspace.dependencies]
+slog = "2.7.0"
+slog-async = "2.7.0"
+slog-json = "2.6.1"
+log = "0.4.17"
+lambda_runtime = "0.6.1"
+aws-config = "0.47.0"
+aws-sdk-s3 = "0.17.0"
+tokio = { version = "1.20.1", features = ["macros"] }
+tracing = { version = "0.1", features = ["log"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }

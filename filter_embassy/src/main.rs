@@ -2,7 +2,6 @@
 extern crate slog;
 extern crate slog_json;
 extern crate slog_async;
-extern crate fstrings;
 use slog::Drain;
 use std::iter::Iterator;
 use parquet::file::reader::{FileReader, SerializedFileReader};
@@ -85,6 +84,7 @@ async fn function_handler(_event: Request) -> Result<Response<Body>, Error> {
         .header("content-type", "text/html")
         .body(body_str.into())
         .map_err(Box::new)?;
+    info!(log,"Done sending http data");
     Ok(resp)
 }
 

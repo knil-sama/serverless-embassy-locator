@@ -33,10 +33,10 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct EventBridgeDetail {}
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct EventBridgeEvent {
     #[serde(deserialize_with = "deserialize_lambda_string")]
@@ -83,7 +83,7 @@ async fn function_handler(_: LambdaEvent<EventBridgeEvent>) -> Result<Value, Err
     let s3_client = aws_sdk_s3::Client::new(&config);
     let url_source_csv = "https://raw.githubusercontent.com/database-of-embassies/database-of-embassies/master/database_of_embassies.csv";
     let response = reqwest::get(url_source_csv).await?;
-    let content =  response.text().await?;
+    let content =  response.text().await?.replace("QID;", "QID");
     let body = ByteStream::from(content.as_bytes().to_owned());
     // TODO use key for naming instead ? and remove file extensions
     let output_filename = "github_embassies.csv";

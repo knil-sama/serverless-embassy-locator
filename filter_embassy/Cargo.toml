@@ -15,17 +15,16 @@ edition = "2021"
 # and it will keep the alphabetic ordering for you.
 
 [dependencies]
-aws-config = "0.47.0"
-aws-sdk-s3 = "0.17.0"
-fstrings = "0.2.3"
-lambda_http = { version = "0.6.0", default-features = false, features = ["apigw_http"] }
-lambda_runtime = "0.6.0"
-log = "0.4.17"
-parquet = "21.0.0"
-slog = "2.7.0"
-slog-async = "2.7.0"
-slog-json = "2.6.1"
-tokio = { version = "1", features = ["macros"] }
-tracing = { version = "0.1", features = ["log"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+slog.workspace = true
+slog-async.workspace = true
+slog-json.workspace = true
+log.workspace = true
+lambda_runtime.workspace = true
+aws-config.workspace = true
+aws-sdk-s3.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+tracing = { workspace = true, features = ["log"] }
+tracing-subscriber = { workspace = true, default-features = false, features = ["fmt"] }
 
+lambda_http = { version = "0.6.0", default-features = false, features = ["apigw_http"] }
+parquet = "21.0.0"

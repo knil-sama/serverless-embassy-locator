@@ -3,10 +3,12 @@ Transform: AWS::Serverless-2016-10-31
 Description: S3 bucket to EventBridge to Lambda
 
 Parameters:
-  SourceBucket:
+  RawBucket:
     Type: String
-  DestinationBucket:
+    Default: raw-embassies
+  CleanBucket:
     Type: String
+    Default: clean-embassies
   AppName:
     Description: Name of Application
     Type: String
@@ -29,15 +31,15 @@ Resources:
   BucketSourceForImagePolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Sub "${SourceBucket}"
+      Bucket: !Sub "${RawBucket}"
       PolicyDocument:
         Statement:
         - Action: s3:*
           Effect: Deny
           Principal: "*"
           Resource:
-          - !Sub "arn:aws:s3:::${SourceBucket}/*"
-          - !Sub "arn:aws:s3:::${SourceBucket}"
+          - !Sub "arn:aws:s3:::${RawBucket}/*"
+          - !Sub "arn:aws:s3:::${RawBucket}"
           Condition:
             Bool:
               aws:SecureTransport: false
@@ -45,15 +47,15 @@ Resources:
   BucketDestinationForImagePolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Sub "${DestinationBucket}"
+      Bucket: !Sub "${CleanBucket}"
       PolicyDocument:
         Statement:
         - Action: s3:*
           Effect: Deny
           Principal: "*"
           Resource:
-          - !Sub "arn:aws:s3:::${DestinationBucket}/*"
-          - !Sub "arn:aws:s3:::${DestinationBucket}"
+          - !Sub "arn:aws:s3:::${CleanBucket}/*"
+          - !Sub "arn:aws:s3:::${CleanBucket}"
           Condition:
             Bool:
               aws:SecureTransport: false
@@ -61,7 +63,7 @@ Resources:
   CrawlerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./crawler_embassy/target/lambda/crawler_embassy/bootstrap
+      CodeUri: ./target/lambda/crawler_embassy/bootstrap
       Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
       Handler: bootstrap
       Runtime: provided.al2
@@ -69,7 +71,7 @@ Resources:
       Timeout: 30
       Policies:
         - S3WritePolicy:
-            BucketName: !Ref SourceBucket
+            BucketName: !Ref RawBucket
       Events:
         Trigger:
           Type: Schedule
@@ -85,12 +87,14 @@ Resources:
         Variables:
           RUST_BACKTRACE: full
           RUST_LOG: info
+          DESTINATION_BUCKET: !Ref RawBucket
+
 
   ## Lambda function
   CleanFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./clean_embassy/target/lambda/clean_embassy/bootstrap
+      CodeUri: ./target/lambda/clean_embassy/bootstrap
       Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
       Handler: bootstrap
       Runtime: provided.al2
@@ -98,9 +102,9 @@ Resources:
       Timeout: 30
       Policies:
         - S3ReadPolicy:
-            BucketName: !Ref SourceBucket
+            BucketName: !Ref RawBucket
         - S3WritePolicy:
-            BucketName: !Ref DestinationBucket
+            BucketName: !Ref CleanBucket
       Events:
         Trigger:
           Type: EventBridgeRule
@@ -113,7 +117,7 @@ Resources:
               detail:
                 bucket:
                   name:
-                    - !Ref SourceBucket
+                    - !Ref RawBucket
       Tags:
         project: "serverless-embassy-locator"
         application: "backend"
@@ -121,6 +125,8 @@ Resources:
         Variables:
           RUST_BACKTRACE: full
           RUST_LOG: info
+          SOURCE_BUCKET: !Ref RawBucket
+          DESTINATION_BUCKET: !Ref CleanBucket
 
 ##########################################################################
 #  API Gateway HTTP API                                                  #
@@ -149,7 +155,7 @@ Resources:
   FilterFunction:
     Type: 'AWS::Serverless::Function'
     Properties:
-      CodeUri: ./filter_embassy/target/lambda/filter_embassy/bootstrap
+      CodeUri: ./target/lambda/filter_embassy/bootstrap
       Architectures: ["x86_64"] ## can't use arm64 in eu-west-3
       # Function permissions grant an AWS service or another account permission to use a function
       Handler: bootstrap
@@ -158,11 +164,12 @@ Resources:
       Timeout: 30
       Policies:
         - S3ReadPolicy:
-            BucketName: !Ref DestinationBucket
+            BucketName: !Ref CleanBucket
       Environment:
         Variables:
           RUST_BACKTRACE: full
           RUST_LOG: info
+          SOURCE_BUCKET: !Ref CleanBucket
       Tags:
         project: "serverless-embassy-locator"
         application: "backend"
@@ -175,11 +182,11 @@ Resources:
       SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*'
 
 Outputs:
-  SourceBucketName:
-    Value: !Ref SourceBucket
+  RawBucketName:
+    Value: !Ref RawBucket
     Description: S3 Bucket source for object storage
-  DestinationBucketName:
-    Value: !Ref DestinationBucket
+  CleanBucketName:
+    Value: !Ref CleanBucket
     Description: S3 Bucket destination for object storage
   FunctionArn:
     Value: !Ref CleanFunction

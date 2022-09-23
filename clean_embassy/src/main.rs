@@ -13,13 +13,18 @@ use chrono::{DateTime, Utc};
 use csv::{ReaderBuilder};
 use serde_json::{json, Value};
 use std::io::{Cursor};
+use bytes::Bytes;
 use std::iter::Iterator;
+use std::vec::IntoIter;
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::types::AggregatedBytes;
+use aws_sdk_s3::Client;
 use arrow2::io::parquet::write::*;
 use arrow2::chunk::Chunk;
 use arrow2::datatypes::{Field, Schema};
 use arrow2::{array::{Utf8Array, Array, Float32Array}};
+use futures::executor::block_on;
+
+type RowGroupIteratorType = RowGroupIterator<Box<dyn Array>, IntoIter<Result<Chunk<Box<dyn Array>>, arrow2::error::Error>>>;
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,7 +85,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct EventBridgeEventDetailObject {
     #[serde(deserialize_with = "deserialize_lambda_string")]
@@ -99,7 +104,7 @@ pub struct EventBridgeEventDetailObject {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq,Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct EventBridgeDetailBucket {
     #[serde(deserialize_with = "deserialize_lambda_string")]
@@ -107,7 +112,7 @@ pub struct EventBridgeDetailBucket {
     pub name: Option<String>
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct EventBridgeDetail {
     #[serde(deserialize_with = "deserialize_lambda_string")]
@@ -129,7 +134,7 @@ pub struct EventBridgeDetail {
     pub reason: Option<String> // enum ?
 }
 /// https://docs.aws.amazon.com/AmazonS3/latest/userguide/ev-events.html
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct EventBridgeEvent {
     #[serde(deserialize_with = "deserialize_lambda_string")]
@@ -153,11 +158,11 @@ pub struct EventBridgeEvent {
     pub detail: EventBridgeDetail,
 }
 
-fn read_csv(data: AggregatedBytes) -> (Vec<Embassy>, Vec<csv::Error>) {
-    let buf = Cursor::new(data.into_bytes());
+fn read_csv(data: Bytes) -> (Vec<Embassy>, Vec<csv::Error>) {
+    let buf = Cursor::new(data);
     let rdr = ReaderBuilder::new()
     .delimiter(b';')
-    .flexible(false) // avoid error when row contain ; more
+    .flexible(true) // avoid error when row contain ; more
     .from_reader(buf);
     let iter = rdr.into_deserialize();
     let (valid_rows, errors): (Vec<_>, Vec<_>) = iter.partition(Result::is_ok);
@@ -204,6 +209,46 @@ fn generate_arrow(valid_rows: Vec<Embassy>) -> (Schema, Chunk<Box<dyn Array>>) {
     (schema, chunk) 
 }
 
+fn convert_arrow_to_parquet(schema: &Schema, options: WriteOptions, chunk:Chunk<Box<dyn Array>>) -> RowGroupIteratorType{
+    RowGroupIterator::try_new(
+        vec![Ok(chunk)].into_iter(),
+        schema,
+        options,
+        vec![vec![Encoding::Plain]; schema.fields.len()],
+    ).unwrap()
+}
+
+async fn download_from_s3_to_in_memory(s3_client: &Client, bucket: String, key: String) -> Bytes {
+        // DOWNLOAD CSV
+        let resp = s3_client
+        .get_object()
+        .bucket(bucket)
+        .key(key)
+        .send()
+        .await;
+        resp.unwrap().body.collect().await.unwrap().into_bytes()
+}
+async fn write_to_s3(s3_client: &Client, bucket: String, key: String, body: ByteStream) {
+    let _resp = s3_client
+    .put_object()
+    .bucket(bucket)
+    .key(key)
+    .body(body)
+    .send()
+    .await;
+}
+fn write_parquet_in_memory(schema: Schema, options: WriteOptions, row_groups: RowGroupIteratorType) -> FileWriter<Vec<u8>> {
+        // anything implementing `std::io::Write` works
+        let file = vec![];
+        let mut writer = FileWriter::try_new(file, schema, options).unwrap();
+    
+        // Write the file.
+        for group in row_groups {
+            writer.write(group.unwrap()).unwrap();
+        }
+        let _ = writer.end(None).unwrap();
+        writer
+}
 /// This is the main body for the function.
 /// Write your code inside it.
 /// There are some code example in the following URLs:
@@ -224,62 +269,37 @@ async fn function_handler(event: LambdaEvent<EventBridgeEvent>) -> Result<Value,
     let s3_client = aws_sdk_s3::Client::new(&config);
     // Extract some useful information from the request
     info!(log,"received event");
-    // DOWNLOAD CSV
-    let resp = s3_client
-    .get_object()
-    .bucket(event.payload.detail.bucket.name.unwrap())
-    .key(event.payload.detail.object.key.unwrap())
-    .send()
-    .await?;
-    let data = resp.body.collect().await?;
+    let data = block_on(download_from_s3_to_in_memory(&s3_client, event.payload.detail.bucket.name.unwrap(),event.payload.detail.object.key.unwrap()));
 
     // replace with arrow read ? https://github.com/jorgecarleitao/arrow2/blob/v0.13.1/examples/csv_read.rs
-    // seem less felxible to handle error and specify schema
+    // seem less flexible to handle error and specify schema
     let (valid_rows, errors)= read_csv(data);
 
+    // BUNCH OF LOG
     let number_of_valid_records = valid_rows.len().to_string();
     let number_of_errors = errors.len().to_string();
     info!(log,"number of valid rows :{number_of_valid_records}");
     info!(log,"number of errors :{number_of_errors}");
-    let first_error = errors.into_iter().next().unwrap();
-    // currently "msg": "number of errors :1257",
-    info!(log,"first error :{first_error}");
+    //let first_error = errors.into_iter().next().unwrap();
     info!(log,"Done parsing csv");
- 
+    if number_of_valid_records < number_of_errors {
+        panic!("Too much error")
+    }
     let (schema, chunk) = generate_arrow(valid_rows);
+
     let options = WriteOptions {
         write_statistics: true,
         compression: CompressionOptions::Snappy,
         version: Version::V1,
     };
-    let row_groups = RowGroupIterator::try_new(
-        vec![Ok(chunk)].into_iter(),
-        &schema,
-        options,
-        vec![vec![Encoding::Plain]; schema.fields.len()],
-    )?;
 
-    // anything implementing `std::io::Write` works
-    let file = vec![];
+    let row_groups = convert_arrow_to_parquet(&schema, options, chunk);
 
-    let mut writer = FileWriter::try_new(file, schema, options)?;
-
-    // Write the file.
-    for group in row_groups {
-        writer.write(group?)?;
-    }
-    let _ = writer.end(None)?;
+    let writer = write_parquet_in_memory(schema, options, row_groups);
 
     let body = ByteStream::from(writer.into_inner());
-    // TODO use key for naming instead ? and remove file extensions
-    let output_filename = "embassies.parquet";
-    let _resp = s3_client
-    .put_object()
-    .bucket("clean-embassies")
-    .key(output_filename)
-    .body(body)
-    .send()
-    .await?;
+    block_on(write_to_s3(&s3_client, "clean-embassies".to_owned(), "embassies.parquet".to_owned(), body));
+
     info!(log,"Done writing s3 parquet");
     Ok(json!({ "message": "lambda completed"}))
 }
@@ -295,4 +315,32 @@ async fn main() -> Result<(), Error> {
         .init();
 
     run(service_fn(function_handler)).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn can_read_csv() {
+        let (valid, invalid) = read_csv("operator;operatorQID;jurisdictions;jurisdictionQIDs;country;countryQID;city;cityQID;address;latitude;longitude;phone;email;website;facebook;twitter;youtube;picture;pictureAuthor;pictureLicense;pictureLicenseURL;type;typeQID;creation;QID\n
+        Afghanistan;http://www.wikidata.org/entity/Q889;Australia|New Zealand|Fiji;http://www.wikidata.org/entity/Q408|http://www.wikidata.org/entity/Q664|http://www.wikidata.org/entity/Q712;Australia;http://www.wikidata.org/entity/Q408;Canberra;http://www.wikidata.org/entity/Q3114;;-35.32355;149.09222;;;https://www.canberra.mfa.af/;;;;http://commons.wikimedia.org/wiki/Special:FilePath/Afghan%20Embassy%20in%20Canberra.jpg;Kransky;Public domain;;embassy;http://www.wikidata.org/entity/Q3917681;;http://www.wikidata.org/entity/Q106450319\n
+        ffrerg".as_bytes().try_into().unwrap());
+        assert_eq!(1, valid.len());
+        assert_eq!(1, invalid.len());
+    }
+
+    #[test]
+    fn can_read_empty_csv() {
+        let (valid, invalid) = read_csv("".as_bytes().try_into().unwrap());
+        assert_eq!(0, valid.len());
+        assert_eq!(0, invalid.len());
+    }
+
+    #[test]
+    fn can_read_csv_with_empty_header() {
+        // will just skip first row
+        let (valid, invalid) = read_csv("Afghanistan;http://www.wikidata.org/entity/Q889;Australia|New Zealand|Fiji;http://www.wikidata.org/entity/Q408|http://www.wikidata.org/entity/Q664|http://www.wikidata.org/entity/Q712;Australia;http://www.wikidata.org/entity/Q408;Canberra;http://www.wikidata.org/entity/Q3114;;-35.32355;149.09222;;;https://www.canberra.mfa.af/;;;;http://commons.wikimedia.org/wiki/Special:FilePath/Afghan%20Embassy%20in%20Canberra.jpg;Kransky;Public domain;;embassy;http://www.wikidata.org/entity/Q3917681;;http://www.wikidata.org/entity/Q106450319\nAfghanistan;http://www.wikidata.org/entity/Q889;Australia|New Zealand|Fiji;http://www.wikidata.org/entity/Q408|http://www.wikidata.org/entity/Q664|http://www.wikidata.org/entity/Q712;Australia;http://www.wikidata.org/entity/Q408;Canberra;http://www.wikidata.org/entity/Q3114;;-35.32355;149.09222;;;https://www.canberra.mfa.af/;;;;http://commons.wikimedia.org/wiki/Special:FilePath/Afghan%20Embassy%20in%20Canberra.jpg;Kransky;Public domain;;embassy;http://www.wikidata.org/entity/Q3917681;;http://www.wikidata.org/entity/Q106450319\n".as_bytes().try_into().unwrap());
+        assert_eq!(0, valid.len());
+        assert_eq!(0, invalid.len());
+    }
 }

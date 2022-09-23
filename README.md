@@ -1,43 +1,37 @@
 # serverless-embassy-locator
 
-goal of this project is to have a simple use case for new aws features: [s3 Object Lambda](https://aws.amazon.com/blogs/aws/introducing-amazon-s3-object-lambda-use-your-code-to-process-data-as-it-is-being-retrieved-from-s3/)
+## Purpose
 
-1. Fetch individual files for each countries locating their embassies
-2. Push file on s3 (private)
-3. Create s3 Object Lambda function to filter closest embassy using nationality and coordinate
-
-s3 Object feature is only available on console, cli and aws sdk.
-
-So we will use aws cli for setting thing up
-
-```
-init.sh
-fetch.sh
-sync_to_s3.sh
-create_access_point.sh
-```
-
-Try using this extension for facilitate lambda and rust integration https://github.com/awslabs/aws-lambda-rust-runtime
+## Architecture
 
 clean_embassy: lambda in Rust that will be trigger by a new file pushed on s3 then clean the csv and push to another s3 folder in parquet
 
-cargo lambda deploy \
-  --iam-role arn:aws:iam::XXXXXXXXXXXXX:role/your_lambda_execution_role
+## Stack
 
-  cargo lambda invoke --remote \
-  --data-ascii '{"command": "hi"}' \
-  --output-format json \
-  my-first-lambda-function
+### Rust
+Used this extension for facilitate lambda and rust integration https://github.com/awslabs/aws-lambda-rust-runtime
 
-  sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-eu-west-3-aws-sam --s3-prefix serverless-embassy --parameter-overrides SourceBucket=raw-embassies DestinationBucket=clean-embassies --region eu-west-3
+We setup workspace so shared dependency are below root [Cargo.toml](./Cargo.toml)
 
-Great work already done here to agregate and clean embassies
-https://github.com/database-of-embassies/database-of-embassies
+`cargo test`
 
-aws-sso-util console launch --account-id 650593633156 --role-name AdministratorAccess
+### SAM
 
-aws s3 cp ./data/embassie.csv s3://raw-embassies/embassie.csv
+s3 ressource aren't created by SAM because it's tricky to delete or reuse them with it so they were created by hand
 
-use arrow https://docs.rs/arrow/0.13.0/arrow/csv/reader/index.html ? how to handle except in row ?
+Everything else is done using SAM, policy for tag are handled in another repository
 
-go back to initial plan and write struct as parquet ?
+
+## Deployment
+
+Build lamda
+
+`cargo lambda build --release --target=x86_64-unknown-linux-gnu --features vendored`
+
+`sam deploy --profile admin --stack-name serverless-embassy --capabilities CAPABILITY_IAM --s3-bucket cdemonchy-eu-west-3-aws-sam --s3-prefix serverless-embassy --region eu-west-3`
+
+# TODO
+
+fix current csv when crawling or cleaning
+
+use env variable for bucket name

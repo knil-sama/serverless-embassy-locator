@@ -11,6 +11,10 @@ clean_embassy: lambda in Rust that will be trigger by a new file pushed on s3 th
 ### Rust
 Used this extension for facilitate lambda and rust integration https://github.com/awslabs/aws-lambda-rust-runtime
 
+Install it with
+`pipx install cargo-lambda`
+`snap install zig --classic --beta`
+
 We setup workspace so shared dependency are below root [Cargo.toml](./Cargo.toml)
 
 `cargo test`
